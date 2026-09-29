@@ -6,6 +6,11 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch: # Permite probarlo manualmente cuando quieras
 
+# Permisos para que GitHub Actions pueda desactivar el workflow en caso de éxito
+permissions:
+  actions: write
+  contents: read
+
 jobs:
   apply-stack:
     runs-on: ubuntu-latest
@@ -31,7 +36,6 @@ jobs:
 
       - name: Ejecutar Apply en el Stack
         id: oci_apply
-        continue-on-error: true
         run: |
           echo "Lanzando intento en Oracle Cloud..."
           OUTPUT=$(oci resource-manager job create-apply-job \
@@ -42,16 +46,29 @@ jobs:
           
           echo "$OUTPUT"
           
-          if echo "$OUTPUT" | grep -q "SUCCEEDED"; then
+          # Extraer el estado real del JSON devuelto por Oracle
+          STATE=$(echo "$OUTPUT" | jq -r '.data["lifecycle-state"] // "UNKNOWN"')
+          echo "Estado detectado en OCI: $STATE"
+          
+          if [ "$STATE" = "SUCCEEDED" ]; then
             echo "SUCCESS=true" >> $GITHUB_ENV
           else
             echo "SUCCESS=false" >> $GITHUB_ENV
+            echo "Intento fallido por falta de capacidad o error de Terraform. Finalizando..."
             exit 1
           fi
 
       - name: Notificar por Telegram si se creó con éxito
-        if: env.SUCCESS == 'true'
+        if: success() && env.SUCCESS == 'true'
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
             -d text="🚀 ¡ÉXITO! Tu instancia Ampere ARM se ha creado correctamente en Oracle Cloud."
+
+      - name: Desactivar la automatización
+        if: success() && env.SUCCESS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "¡Instancia creada! Desactivando el flujo de trabajo para no hacer más peticiones..."
+          gh workflow disable "retry.yml"
