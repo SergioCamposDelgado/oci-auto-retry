@@ -1,0 +1,47 @@
+name: Reintento Automatico OCI
+
+on:
+  schedule:
+    # Se ejecuta automáticamente cada 15 minutos
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Permite probarlo manualmente cuando quieras
+
+jobs:
+  apply-stack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurar OCI CLI
+        uses: oracle-actions/setup-oci-cli@v1
+        with:
+          user: ${{ secrets.OCI_USER }}
+          tenancy: ${{ secrets.OCI_TENANCY }}
+          fingerprint: ${{ secrets.OCI_FINGERPRINT }}
+          region: ${{ secrets.OCI_REGION }}
+          api_key: ${{ secrets.OCI_KEY_FILE }}
+
+      - name: Ejecutar Apply en el Stack
+        id: oci_apply
+        continue-on-error: true
+        run: |
+          echo "Lanzando intento en Oracle Cloud..."
+          OUTPUT=$(oci resource-manager job create-apply-job \
+            --stack-id "${{ secrets.OCI_STACK_ID }}" \
+            --execution-plan-strategy AUTO_APPROVED \
+            --wait-for-state SUCCEEDED \
+            --wait-for-state FAILED 2>&1)
+          
+          echo "$OUTPUT"
+          
+          if echo "$OUTPUT" | grep -q "SUCCEEDED"; then
+            echo "SUCCESS=true" >> $GITHUB_ENV
+          else
+            echo "SUCCESS=false" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: Notificar por Telegram si se creó con éxito
+        if: env.SUCCESS == 'true'
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="🚀 ¡ÉXITO! Tu instancia Ampere ARM de 4 OCPU y 24GB RAM se ha creado correctamente en Oracle Cloud."
