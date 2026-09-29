@@ -10,14 +10,24 @@ jobs:
   apply-stack:
     runs-on: ubuntu-latest
     steps:
-      - name: Configurar OCI CLI
-        uses: oracle-actions/setup-oci-cli@v1
-        with:
-          user: ${{ secrets.OCI_USER }}
-          tenancy: ${{ secrets.OCI_TENANCY }}
-          fingerprint: ${{ secrets.OCI_FINGERPRINT }}
-          region: ${{ secrets.OCI_REGION }}
-          api_key: ${{ secrets.OCI_KEY_FILE }}
+      - name: Instalar OCI CLI
+        run: |
+          pipx install oci-cli
+
+      - name: Configurar credenciales OCI
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_KEY_FILE }}" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+          
+          cat <<EOF > ~/.oci/config
+          [DEFAULT]
+          user=${{ secrets.OCI_USER }}
+          fingerprint=${{ secrets.OCI_FINGERPRINT }}
+          tenancy=${{ secrets.OCI_TENANCY }}
+          region=${{ secrets.OCI_REGION }}
+          key_file=~/.oci/oci_api_key.pem
+          EOF
 
       - name: Ejecutar Apply en el Stack
         id: oci_apply
@@ -44,4 +54,4 @@ jobs:
         run: |
           curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d text="🚀 ¡ÉXITO! Tu instancia Ampere ARM de 4 OCPU y 24GB RAM se ha creado correctamente en Oracle Cloud."
+            -d text="🚀 ¡ÉXITO! Tu instancia Ampere ARM se ha creado correctamente en Oracle Cloud."
