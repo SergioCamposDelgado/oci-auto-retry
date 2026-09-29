@@ -6,10 +6,13 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch: # Permite probarlo manualmente cuando quieras
 
-# Permisos para que GitHub Actions pueda desactivar el workflow en caso de éxito
 permissions:
   actions: write
   contents: read
+
+env:
+  SUPPRESS_LABEL_WARNING: 'True'
+  OCI_CLI_SUPPRESS_FILE_PERMISSIONS_WARNING: 'True'
 
 jobs:
   apply-stack:
@@ -33,6 +36,8 @@ jobs:
           region=${{ secrets.OCI_REGION }}
           key_file=~/.oci/oci_api_key.pem
           EOF
+          
+          chmod 600 ~/.oci/config
 
       - name: Ejecutar Apply en el Stack
         id: oci_apply
@@ -46,15 +51,28 @@ jobs:
           
           echo "$OUTPUT"
           
-          # Extraer el estado real del JSON devuelto por Oracle
-          STATE=$(echo "$OUTPUT" | jq -r '.data["lifecycle-state"] // "UNKNOWN"')
+          # Extraer el estado real aislando el JSON con Python
+          STATE=$(python3 -c "
+          import sys, json, re
+          text = sys.stdin.read()
+          match = re.search(r'\{.*\}', text, re.DOTALL)
+          if match:
+              try:
+                  data = json.loads(match.group(0))
+                  print(data.get('data', {}).get('lifecycle-state', 'UNKNOWN'))
+              except Exception:
+                  print('UNKNOWN')
+          else:
+              print('UNKNOWN')
+          " <<< "$OUTPUT")
+
           echo "Estado detectado en OCI: $STATE"
           
           if [ "$STATE" = "SUCCEEDED" ]; then
             echo "SUCCESS=true" >> $GITHUB_ENV
           else
             echo "SUCCESS=false" >> $GITHUB_ENV
-            echo "Intento fallido por falta de capacidad o error de Terraform. Finalizando..."
+            echo "Intento fallido (sin capacidad en Madrid). Se reintentará automáticamente en el siguiente ciclo."
             exit 1
           fi
 
