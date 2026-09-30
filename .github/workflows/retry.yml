@@ -1,9 +1,8 @@
 name: Reintento Automatico OCI
 
 on:
-  schedule:
-    # Se ejecuta automáticamente cada 15 minutos
-    - cron: '*/15 * * * *'
+  repository_dispatch:
+    types: [lanzar-intento-oci] # Evento que llamará tu cron externo
   workflow_dispatch: # Permite probarlo manualmente cuando quieras
 
 permissions:
@@ -89,4 +88,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "¡Instancia creada! Desactivando el flujo de trabajo para no hacer más peticiones..."
-          gh workflow disable "retry.yml"
+          # Reemplaza 'el-nombre-de-tu-archivo.yml' por el nombre real de tu archivo en el repositorio
+          gh workflow disable el-nombre-de-tu-archivo.yml
