@@ -1,0 +1,28 @@
+# OCI & SSH Credentials
+*.pem
+*.key
+*.pub
+oci_api_key*
+.oci/
+config
+
+# Environment variables & secrets
+.env
+.env.*
+*.secret
+
+# Logs & temp
+*.log
+tmp/
+temp/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE & Editor folders
+.vscode/
+.idea/
+*.swp
+*~

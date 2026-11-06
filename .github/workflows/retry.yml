@@ -71,15 +71,18 @@ jobs:
             echo "SUCCESS=true" >> $GITHUB_ENV
           else
             echo "SUCCESS=false" >> $GITHUB_ENV
-            echo "Intento fallido (sin capacidad en Madrid). Se reintentará automáticamente en el siguiente ciclo."
+            echo "Intento fallido (sin capacidad en la región). Se reintentará automáticamente en el siguiente ciclo."
             exit 0
           fi
 
       - name: Notificar por Telegram si se creó con éxito
-        if: success() && env.SUCCESS == 'true'
+        if: success() && env.SUCCESS == 'true' && env.TELEGRAM_TOKEN != ''
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
             -d text="🚀 ¡ÉXITO! Tu instancia Ampere ARM se ha creado correctamente en Oracle Cloud."
 
       - name: Desactivar la automatización
@@ -88,5 +91,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "¡Instancia creada! Desactivando el flujo de trabajo para no hacer más peticiones..."
-          # Reemplaza 'el-nombre-de-tu-archivo.yml' por el nombre real de tu archivo en el repositorio
-          gh workflow disable el-nombre-de-tu-archivo.yml
+          gh workflow disable retry.yml
